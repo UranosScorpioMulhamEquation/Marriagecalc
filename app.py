@@ -37,9 +37,6 @@ PLANETS = {
     'Pluto': swe.PLUTO, 'Rahu': swe.TRUE_NODE
 }
 
-# الكواكب التي لها أورب 3 درجات فقط
-OUTER_PLANETS = ['Uranus', 'Neptune', 'Pluto']
-
 ZODIAC_NAMES = [
     "الحمل", "الثور", "الجوزاء", "السرطان", 
     "الأسد", "العذراء", "الميزان", "العقرب", 
@@ -82,31 +79,30 @@ def get_house_of_planet(p_lon, cusps):
 
 def check_midpoint_activation(sr_planets, midpoint_lon):
     """
-    التحقق الدقيق من تفعيل كواكب السنوية لمحور الميد بوينت.
-    - +/- 3 درجات لكواكب أورانوس، نبتون، وبلوتو.
-    - +/- 2 درجة لجميع الكواكب الأخرى والنقاط (شاملة راهو وكيتو).
+    التحقق الدقيق من تفعيل كواكب السنوية للميد بوينت:
+    - الكوكب السنوي يقع في نفس برج الميد بوينت الميلادي.
+    - الفرق بين درجة الميد بوينت والكوكب السنوي أقل من درجتين لجميع الكواكب.
     """
-    axis_longitudes = [(midpoint_lon + k * 90) % 360 for k in range(4)]
-    
+    midpoint_sign = int(midpoint_lon / 30)
     activated_planets = []
+    
     for p_name, p_data in sr_planets.items():
         p_lon = p_data['lon']
+        p_sign = p_data['sign']
         
-        # تحديد الأورب المسموح
-        orb = 3.0 if p_name in OUTER_PLANETS else 2.0
-        
-        for target_lon in axis_longitudes:
-            diff = abs(p_lon - target_lon)
-            if diff > 180: diff = 360 - diff
-            if diff <= orb:
-                sign_idx = int(p_lon / 30)
+        # التأكد أن الكوكب في نفس برج الميد بوينت
+        if p_sign == midpoint_sign:
+            # حساب الفرق الصافي بين الدرجتين ضمن نفس البرج
+            diff = abs(p_lon - midpoint_lon)
+            
+            # التأكد أن الفرق أقل من درجتين
+            if diff < 2.0:
                 deg_in_sign = p_lon % 30
-                p_label = "أورانوس/نبتون/بلوتو" if p_name in OUTER_PLANETS else "كواكب/نقاط أخرى"
-                activated_planets.append(f"{p_name} ({p_label}) في {deg_in_sign:.1f}° {ZODIAC_NAMES[sign_idx]} [فرق: {diff:.1f}°]")
-                break
+                activated_planets.append(f"{p_name} في {deg_in_sign:.1f}° {ZODIAC_NAMES[p_sign]} [فرق: {diff:.1f}°]")
+                
     return activated_planets
 
-def is_before_cusp(p_lon, cusp_lon, orb=6):
+def is_before_cusp(p_lon, cusp_lon, orb=3): # تم تقليص الأورب إلى 3 درجات
     diff = (cusp_lon - p_lon) % 360
     return diff <= orb
 
@@ -172,8 +168,7 @@ if submit:
             f"* موقع الشمس: `{natal_sun%30:.2f}°` {ZODIAC_NAMES[int(natal_sun/30)]}\n"
             f"* موقع القمر: `{natal_moon%30:.2f}°` {ZODIAC_NAMES[int(natal_moon/30)]}\n"
             f"* **الميد بوينت (شمس/قمر):** `{midpoint_deg:.2f}°` **{ZODIAC_NAMES[midpoint_sign_idx]}**\n"
-            f"* **محور الميد بوينت النشط (درجة {midpoint_deg:.1f}° من):** {ZODIAC_NAMES[midpoint_sign_idx]}، {ZODIAC_NAMES[(midpoint_sign_idx+6)%12]}، {ZODIAC_NAMES[(midpoint_sign_idx+3)%12]}، {ZODIAC_NAMES[(midpoint_sign_idx+9)%12]}\n"
-            f"* **ضوابط الأورب للميد بوينت:** ±3° لأورانوس ونبتون وبلوتو | ±2° لباقي الكواكب والنقاط (شاملة راهو وكيتو)")
+            f"* **ضوابط الأورب للميد بوينت:** الكوكب السنوي في نفس البرج ({ZODIAC_NAMES[midpoint_sign_idx]}) بفرق أقل من درجتين لجميع الكواكب.")
     
     start_year = birth_date.year + 18
     end_year = birth_date.year + 60
@@ -212,7 +207,7 @@ if submit:
             'house': get_house_of_planet(ketu_lon, sr_cusps)
         }
 
-        # 1. شرط أساسي: تفعيل الميد بوينت بالأورب المسموح (+/- 3 لأورانوس/نبتون/بلوتو و +/- 2 لغيرهم)
+        # 1. شرط أساسي: تفعيل الميد بوينت (في نفس البرج وبفرق أقل من درجتين)
         activated_midpoint_planets = check_midpoint_activation(sr_planets, midpoint_lon)
         if not activated_midpoint_planets:
             progress_bar.progress(progress_val)
@@ -222,55 +217,55 @@ if submit:
         dallalat_details = []
         dallalat_count = 0
         
-        # دلالة 1: طالع السنوية في بيوت الزواج/الأوتاد الميلادية (1، 4، 5، 7، 10)
+        # دلالة 1
         sr_asc_in_natal = get_house_of_planet(sr_asc, natal_cusps)
         if sr_asc_in_natal in [1, 4, 5, 7, 10]:
             dallalat_count += 1
             dallalat_details.append(f"1. طالع العودة الشمسية يقع في **البيت {sr_asc_in_natal} الميلادي** (بيت وتدي/ارتباط)")
 
-        # دلالة 2: موقع شمس السنوية في بيوت الأوتاد/الارتباط السنوية (1، 4، 5، 7، 10)
+        # دلالة 2
         if sr_planets['Sun']['house'] in [1, 4, 5, 7, 10]:
             dallalat_count += 1
             dallalat_details.append(f"2. الشمس السنوية في **البيت {sr_planets['Sun']['house']} السنوي**")
             
-        # دلالة 3: موقع قمر السنوية في بيوت الأوتاد/الارتباط السنوية (1، 4، 5، 7، 10)
+        # دلالة 3
         if sr_planets['Moon']['house'] in [1, 4, 5, 7, 10]:
             dallalat_count += 1
             dallalat_details.append(f"3. القمر السنوي في **البيت {sr_planets['Moon']['house']} السنوي**")
 
-        # دلالة 4: تواجد كواكب في البيت السابع السنوي (بيت الزواج والشراكة)
+        # دلالة 4
         planets_in_7th = [p_name for p_name, p_data in sr_planets.items() if p_data['house'] == 7]
         if len(planets_in_7th) >= 1:
             dallalat_count += 1
             dallalat_details.append(f"4. تواجد كواكب بالبيت السابع السنوي: ({', '.join(planets_in_7th)})")
 
-        # دلالة 5: هيمنة أو كثرة الكواكب بالبيت السابع السنوي (3 كواكب فما فوق)
+        # دلالة 5
         if len(planets_in_7th) >= 3:
             dallalat_count += 1
             dallalat_details.append(f"5. هيمنة البيت السابع السنوي بـ ({len(planets_in_7th)}) كواكب")
 
-        # دلالة 6: تواجد أدلة عاطفية بالبيت الخامس السنوي (الزهرة، المشتري، الشمس، القمر)
+        # دلالة 6
         planets_in_5th = [p_name for p_name in ['Venus', 'Jupiter', 'Sun', 'Moon'] if sr_planets[p_name]['house'] == 5]
         if len(planets_in_5th) >= 1:
             dallalat_count += 1
             dallalat_details.append(f"6. تواجد أدلة عاطفية في البيت الخامس السنوي: ({', '.join(planets_in_5th)})")
 
-        # دلالة 7: وضعية الزهرة السنوية (بالبيوت 1، 4، 5، 7، 10 أو بأبراج الثور، السرطان، الميزان، الجدي، الحوت)
+        # دلالة 7
         if sr_planets['Venus']['house'] in [1, 4, 5, 7, 10] or sr_planets['Venus']['sign'] in [1, 3, 6, 9, 11]:
             dallalat_count += 1
             dallalat_details.append(f"7. الزهرة في موقع قوي إما بالبيت {sr_planets['Venus']['house']} السنوي أو برج مستجيب للزواج")
 
-        # دلالة 8: وضعية المريخ السنوي (في أبراج الحمل، الجدي أو في بيوت الأوتاد/الارتباط)
+        # دلالة 8
         if sr_planets['Mars']['sign'] in [0, 9] or sr_planets['Mars']['house'] in [1, 4, 5, 7, 10]:
             dallalat_count += 1
             dallalat_details.append(f"8. المريخ في موقعه الأصلي/شرفه أو بالبيت {sr_planets['Mars']['house']} السنوي")
 
-        # دلالة 9: وضعية المشتري السنوي (في بيوت الأوتاد/الارتباط السنوية 1، 4، 5، 7، 10)
+        # دلالة 9
         if sr_planets['Jupiter']['house'] in [1, 4, 5, 7, 10]:
             dallalat_count += 1
             dallalat_details.append(f"9. المشتري (كوكب السعادة والاتساع) في البيت {sr_planets['Jupiter']['house']} السنوي")
 
-        # دلالة 10: اتصال كواكب رئيسية بأوتاد السنوية (قبل أوتاد 1، 4، 5، 7، 10 السنوية بـ 6 درجات فأقل)
+        # دلالة 10: الأورب المعدل إلى 3 درجات
         target_planets = ['Uranus', 'Venus', 'Jupiter', 'Sun', 'Rahu', 'Ketu', 'Mars', 'Moon']
         target_cusps = [sr_cusps[0], sr_cusps[3], sr_cusps[4], sr_cusps[6], sr_cusps[9]] # 1, 4, 5, 7, 10
         
@@ -278,17 +273,17 @@ if submit:
         for p_name in target_planets:
             p_lon = sr_planets[p_name]['lon']
             for cusp_idx, cusp in enumerate(target_cusps):
-                if is_before_cusp(p_lon, cusp, orb=6):
+                if is_before_cusp(p_lon, cusp, orb=3): # استخدام المتغير المعدل للاتصال الفعال
                     house_num = 1 if cusp_idx==0 else (4 if cusp_idx==1 else (5 if cusp_idx==2 else (7 if cusp_idx==3 else 10)))
                     cusp_contacts.append(f"{p_name} قبل وتد البيت {house_num}")
                     break
                     
         if cusp_contacts:
             dallalat_count += 1
-            dallalat_details.append(f"10. اتصال أدلة الزواج بأوتاد السنوية: ({', '.join(cusp_contacts)})")
+            dallalat_details.append(f"10. اتصال أدلة الزواج بأوتاد السنوية (بـ 3 درجات فأقل): ({', '.join(cusp_contacts)})")
 
-        # 3. الشرط القاطع للمخرجات: تحقق الميد بوينت + توفر من 3 إلى 10 دلالات
-        if 3 <= dallalat_count <= 10:
+        # 3. الشرط القاطع: تجاوز 4 دلالات بعد تفعيل الميد بوينت
+        if dallalat_count > 4:
             marriage_years.append({
                 "year": target_year, 
                 "age": target_year - birth_date.year, 
@@ -300,7 +295,7 @@ if submit:
         progress_bar.progress(progress_val)
 
     # طباعة السنوات المستخرجة
-    st.subheader("السنوات المتحققة (شرط الميد بوينت + تحقق من 3 إلى 10 دلالات زواج):")
+    st.subheader("السنوات المتحققة (شرط الميد بوينت الدقيق + ظهور أكثر من 4 دلالات زواج):")
     
     if marriage_years:
         for m in marriage_years:
@@ -313,4 +308,4 @@ if submit:
                 for d in m['details']:
                     st.write(f"- {d}")
     else:
-        st.warning("لم يتم العثور على سنوات تطابق الشروط الدقيقة (شرط الميد بوينت + تحقق 3 دلالات فأكثر من أصل 10).")
+        st.warning("لم يتم العثور على سنوات تطابق الشروط الدقيقة (الكوكب السنوي في نفس برج الميد بوينت بفرق < 2° + تجاوز 4 دلالات زواج).")
